@@ -54,17 +54,17 @@ var (
 		Aggregation: view.Count(),
 	}
 
-	// ClientRoundtripLatency ...
+	// ClientRoundtripLatency measures end to end latency from the client perspective.
 	ClientRoundtripLatency = &view.View{
 		Name:        "twirp/client/roundtrip_latency",
 		Measure:     ochttp.ClientRoundtripLatency,
 		Aggregation: ochttp.DefaultLatencyDistribution,
-		Description: "End-to-end latency, by HTTP method and response status",
+		Description: "End-to-end latency",
 		TagKeys:     []tag.Key{PackageName, ServiceName, MethodName, ochttp.StatusCode},
 	}
 )
 
-// WrapTransport wraps the ochttp transport to inject twirp metadata
+// WrapTransport wraps the ochttp transport to inject twirp metadata.
 func WrapTransport(base *ochttp.Transport) http.RoundTripper {
 	// before -> ochttp -> after -> base
 	o := *base
@@ -138,13 +138,13 @@ type hookState struct {
 	span      *trace.Span
 }
 
-// Tracer ...
+// Tracer adds Opencensus tracing and metrics to twirp servers.
 type Tracer struct {
 	Propagation  propagation.HTTPFormat
 	StartOptions trace.StartOptions
 }
 
-// WrapHandler ..
+// WrapHandler wraps an http handler to inject Opencensus tracing and metrics.
 func (t *Tracer) WrapHandler(handler http.Handler) http.Handler {
 	o := ochttp.Handler{
 		Propagation:  t.Propagation,
@@ -155,7 +155,7 @@ func (t *Tracer) WrapHandler(handler http.Handler) http.Handler {
 	return &o
 }
 
-// ServerHooks ...
+// ServerHooks creates twrip server hooks for Opencensus tracing and metrics.
 func (t *Tracer) ServerHooks() *twirp.ServerHooks {
 	return &twirp.ServerHooks{
 		RequestReceived: t.requestReceived,
