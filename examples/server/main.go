@@ -52,14 +52,15 @@ func main() {
 
 	trace.RegisterExporter(logTraceExporter{})
 
-	h := &octwirp.Hook{
+	t := &octwirp.Tracer{
 		StartOptions: trace.StartOptions{
 			Sampler: trace.AlwaysSample(),
 		},
 	}
 
-	server := example.NewHaberdasherServer(&randomHaberdasher{}, h.ServerHooks())
-	http.Handle(server.PathPrefix(), server)
+	server := example.NewHaberdasherServer(&randomHaberdasher{}, t.ServerHooks())
+	handler := t.WrapHandler(server)
+	http.Handle(server.PathPrefix(), handler)
 
 	log.Fatal(http.ListenAndServe("127.0.0.1:8080", nil))
 }

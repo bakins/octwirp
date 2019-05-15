@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.opencensus.io/plugin/ochttp"
+	"go.opencensus.io/trace/propagation"
 
 	"github.com/twitchtv/twirp"
 	"go.opencensus.io/stats"
@@ -137,21 +138,33 @@ type hookState struct {
 	span      *trace.Span
 }
 
-// Hook ...
-type Hook struct {
+// Tracer ...
+type Tracer struct {
+	Propagation  propagation.HTTPFormat
 	StartOptions trace.StartOptions
 }
 
+// WrapHandler ..
+func (t *Tracer) WrapHandler(handler http.Handler) http.Handler {
+	o := ochttp.Handler{
+		Propagation:  t.Propagation,
+		StartOptions: t.StartOptions,
+		Handler:      handler,
+	}
+
+	return &o
+}
+
 // ServerHooks ...
-func (h *Hook) ServerHooks() *twirp.ServerHooks {
+func (t *Tracer) ServerHooks() *twirp.ServerHooks {
 	return &twirp.ServerHooks{
-		RequestReceived: h.requestReceived,
-		RequestRouted:   h.requestRouted,
-		ResponseSent:    h.responseSent,
+		RequestReceived: t.requestReceived,
+		RequestRouted:   t.requestRouted,
+		ResponseSent:    t.responseSent,
 	}
 }
 
-func (h *Hook) requestReceived(ctx context.Context) (context.Context, error) {
+func (t *Tracer) requestReceived(ctx context.Context) (context.Context, error) {
 	// method name has not been set by twirp yet
 	p, _ := twirp.PackageName(ctx)
 	s, _ := twirp.ServiceName(ctx)
@@ -164,7 +177,7 @@ func (h *Hook) requestReceived(ctx context.Context) (context.Context, error) {
 	// TODO: package name is not required?
 	ctx, span := trace.StartSpan(ctx,
 		fmt.Sprintf(p+"."+s),
-		trace.WithSampler(h.StartOptions.Sampler),
+		trace.WithSampler(t.StartOptions.Sampler),
 		trace.WithSpanKind(trace.SpanKindServer),
 	)
 
@@ -183,7 +196,7 @@ func (h *Hook) requestReceived(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-func (h *Hook) requestRouted(ctx context.Context) (context.Context, error) {
+func (t *Tracer) requestRouted(ctx context.Context) (context.Context, error) {
 	hs, ok := ctx.Value(hookStateKey).(*hookState)
 	if !ok {
 		return ctx, nil
@@ -201,7 +214,7 @@ func (h *Hook) requestRouted(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-func (h *Hook) responseSent(ctx context.Context) {
+func (t *Tracer) responseSent(ctx context.Context) {
 	s, _ := twirp.StatusCode(ctx)
 
 	ctx, _ = tag.New(ctx, tag.Insert(StatusCode, s))
