@@ -75,7 +75,8 @@ func WrapTransport(base *ochttp.Transport) http.RoundTripper {
 	}
 
 	a := afterTransport{
-		next: orig,
+		next:         orig,
+		startOptions: base.StartOptions,
 	}
 
 	o.Base = &a
@@ -108,24 +109,33 @@ func (t *beforeTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 type afterTransport struct {
-	next http.RoundTripper
+	startOptions trace.StartOptions
+	next         http.RoundTripper
 }
 
 func (t *afterTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	ctx := r.Context()
 
-	if span := trace.FromContext(ctx); span != nil {
-		p, _ := twirp.PackageName(ctx)
-		s, _ := twirp.ServiceName(ctx)
-		m, _ := twirp.MethodName(ctx)
+	// TODO: package is not required?
+	p, _ := twirp.PackageName(ctx)
+	s, _ := twirp.ServiceName(ctx)
+	m, _ := twirp.MethodName(ctx)
 
-		span.AddAttributes(
-			trace.StringAttribute(PackageName.Name(), p),
-			trace.StringAttribute(ServiceName.Name(), s),
-			trace.StringAttribute(MethodName.Name(), m),
-		)
-	}
+	ctx, span := trace.StartSpan(ctx,
+		fmt.Sprintf(p+"."+s+"/"+m),
+		trace.WithSampler(t.startOptions.Sampler),
+		trace.WithSpanKind(trace.SpanKindClient),
+	)
 
+	defer span.End()
+
+	span.AddAttributes(
+		trace.StringAttribute(PackageName.Name(), p),
+		trace.StringAttribute(ServiceName.Name(), s),
+		trace.StringAttribute(MethodName.Name(), m),
+	)
+
+	r = r.WithContext(ctx)
 	return t.next.RoundTrip(r)
 }
 
