@@ -69,7 +69,7 @@ For a more complete client example, see [./examples/client/main.go](./examples/c
 
 ## Status
 
-This project is undert active development.  I have only recently began using twirp, so I am sure there are better ways to do things.
+This project is under active development.  I have only recently began using twirp, so I am sure there are better ways to do things.
 
 ## LICENSE
 
